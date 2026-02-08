@@ -1,0 +1,5 @@
+﻿bible_scraper.log
+html_cache
+data
+__pycache__
+*.json

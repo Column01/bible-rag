@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools >= 61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bible_rag"
+version = "0.0.1"
+authors = [
+    {name = "Column01", email = "column01dev@gmail.com"},
+]
+description = "A tool for using RAG over scripture"
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "bible_versions @ git+https://github.com/Column01/bible-versions.git@main",
+    "lmstudio",
+    "usearch>=2.23.0"
+]
+
+[project.scripts]
+bible-rag = "bible_rag.bible_rag:main"

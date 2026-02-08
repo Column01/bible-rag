@@ -1,0 +1,209 @@
+
+# From github
+# https://github.com/arron-taylor/bible-versions/blob/fa1ee08579e0f78c9121be4252b5266d769f92d3/scraping/multi_language/helpers/build_locale_version_map.py#L61-L266
+KNOWN_CODES = {
+    # Core English/BibleHub-friendly versions
+    "NEW INTERNATIONAL VERSION": "NIV",
+    "NEW LIVING TRANSLATION": "NLT",
+    "ENGLISH STANDARD VERSION": "ESV",
+    "BEREAN STUDY BIBLE": "BSB",
+    "KING JAMES BIBLE": "KJV",
+    "NEW KING JAMES VERSION": "NKJV",
+    "AMPLIFIED BIBLE": "AMP",
+    "CHRISTIAN STANDARD BIBLE": "CSB",
+    "HOLMAN CHRISTIAN STANDARD BIBLE": "HCSB",
+    "CONTEMPORARY ENGLISH VERSION": "CEV",
+    "GOOD NEWS TRANSLATION": "GNT",
+    "AMERICAN STANDARD VERSION": "ASV",
+    "DARBY BIBLE TRANSLATION": "DBY",
+    "DOUAY-RHEIMS BIBLE": "DRB",
+    "EASY-TO-READ VERSION": "ERV",  # if present under a slightly different name, heuristic will still apply
+    "GOD'S WORD® TRANSLATION": "GWT",
+    "INTERNATIONAL STANDARD VERSION": "ISV",
+    "NEW HEART ENGLISH BIBLE": "NHEB",
+    "ORTHODOX JEWISH BIBLE": "OJB",
+    "NEW AMERICAN STANDARD BIBLE": "NASB",
+    "NASB 1977": "NASB77",
+    "NASB 1995": "NASB95",
+    "NEW AMERICAN BIBLE": "NAB",
+    "THE MESSAGE": "MSG",
+    "YOUNG'S LITERAL TRANSLATION": "YLT",
+    "WORLD ENGLISH BIBLE": "WEB",
+    "NEW REVISED STANDARD VERSION": "NRSV",
+    "REVISED STANDARD VERSION": "RSV",
+    "NEW CENTURY VERSION": "NCV",
+    "NEW INTERNATIONAL READER'S VERSION": "NIRV",
+    "GENEVA BIBLE": "GNV",
+    "LEXHAM ENGLISH BIBLE": "LEB",
+    "JUBILEE BIBLE 2000": "JUB",
+
+    # Additional English/public-domain or well-known variants from your files
+    "BEREAN LITERAL BIBLE": "BLB",
+    "BRENTON SEPTUAGINT TRANSLATION": "BST",
+    "CATHOLIC PUBLIC DOMAIN VERSION": "CPDV",
+    "ENGLISH REVISED VERSION": "ERV",  # shares abbreviation; context will disambiguate
+    "GODBEY NEW TESTAMENT": "GNT",      # distinct from GNT2 but user-facing code may still be GNT
+    "GOOD NEWS TRANSLATION": "GNT2",
+    "HAWEIS NEW TESTAMENT": "HNT",
+    "JPS TANAKH 1917": "JPS",
+    "KING JAMES 2000 BIBLE": "KJ2000",
+    "LAMSA BIBLE": "LAMSA",
+    "LEGACY STANDARD BIBLE": "LSB",
+    "LITERAL STANDARD VERSION": "LSV",
+    "MACE NEW TESTAMENT": "MNT",
+    "MAJORITY STANDARD BIBLE": "MSB",
+    "NET BIBLE": "NET",
+    "PESHITTA HOLY BIBLE TRANSLATED": "PESHITTA",
+    "SMITH'S LITERAL TRANSLATION": "SLT",
+    "WEBSTER'S BIBLE TRANSLATION": "WBT",
+    "WEYMOUTH NEW TESTAMENT": "WNT",
+    "WORRELL NEW TESTAMENT": "WORRELL",
+    "WORSLEY NEW TESTAMENT": "WORSLEY",
+
+    # Additional English versions in en/
+    "ANDERSON NEW TESTAMENT": "ANT",
+    "ARAMAIC BIBLE IN PLAIN ENGLISH": "ABPE",
+    "SHUAR NEW TESTAMENT": "SHUARNT",
+    "UMA NEW TESTAMENT": "UMANT",
+
+    # Afrikaans
+    "AFRIKAANS PWL": "AFRPWL",
+
+    # Arabic
+    "ARABIC: SMITH & VAN DYKE": "ARASVD",
+
+    # Bavarian
+    "BAVARIAN": "BAV",
+
+    # Bulgarian
+    "BULGARIAN": "BUL",
+
+    # Czech
+    "CZECH BKR": "BKR",
+
+    # Danish
+    "DANISH": "DAN",
+
+    # German
+    "GERMAN: LUTHER (1912)": "LUTH1912",
+    "GERMAN: MODERNIZED": "GERMOD",
+    "GERMAN: TEXTBIBEL (1899)": "TEXTBIBEL1899",
+
+    # Greek
+    "GREEK NT: TISCHENDORF 8TH ED. - TRANSLITERATED": "TNT8TR",
+    "GREEK ORTHODOX CHURCH 1904": "GOC1904",
+    "NESTLE GREEK NEW TESTAMENT 1904 - TRANSLITERATED": "NGNT1904TR",
+    "NESTLE GREEK NEW TESTAMENT 1904": "NGNT1904",
+    "SWETE'S SEPTUAGINT": "SWETELXX",
+
+    # Esperanto
+    "ESPERANTO": "ESP",
+
+    # Spanish (note: filenames may contain Mojibake, keys match exact filenames)
+    "LA BIBLIA DE LAS AMÃ©RICAS": "LBLA",
+    "LA NUEVA BIBLIA DE LOS HISPANOS": "LNBH",
+    "REINA VALERA 1909": "RV1909",
+    "REINA VALERA GÃ³MEZ": "RVG",
+    "SAGRADAS ESCRITURAS 1569": "SE1569",
+    "TAGALOG: ANG DATING BIBLIA (1905)": "ADB1905",
+
+    # Finnish
+    "FINNISH: BIBLE (1776)": "FIN1776",
+
+    # French
+    "FRENCH: DARBY": "FRDBY",
+    "FRENCH: LOUIS SEGOND (1910)": "LS1910",
+    "FRENCH: MARTIN (1744)": "MR1744",
+
+    # Hebrew
+    "WESTMINSTER LENINGRAD CODEX": "WLC",
+    "WLC (CONSONANTS ONLY)": "WLC-CONSONANTS",
+
+    # Croatian
+    "CROATIAN BIBLE": "CRO",
+
+    # Hungarian
+    "HUNGARIAN: KAROLI": "KAROLI",
+
+    # Armenian
+    "ARMENIAN (WESTERN): NT": "ARMWNT",
+
+    # Indonesian
+    "INDONESIAN - TERJEMAHAN LAMA (TL)": "IDTL",
+
+    # Italian
+    "ITALIAN: GIOVANNI DIODATI BIBLE (1649)": "IGD1649",
+    "ITALIAN: RIVEDUTA BIBLE (1927)": "IRIV1927",
+
+    # Korean
+    "KOREAN": "KOR",
+
+    # Latin
+    "LATIN: VULGATA CLEMENTINA": "VULGCL",
+
+    # Lithuanian
+    "LITHUANIAN": "LIT",
+
+    # Latvian
+    "LATVIAN NEW TESTAMENT": "LAVNT",
+
+    # Maori
+    "MAORI": "MAO",
+
+    # Dutch
+    "DUTCH STATEN VERTALING": "DSV",
+
+    # Norwegian
+    "NORWEGIAN: DET NORSK BIBELSELSKAP (1930)": "DNB1930",
+
+    # Portuguese (filenames include accented characters as-is)
+    "BÃBLIA KING JAMES ATUALIZADA PORTUGUÃªS": "BKJA",
+    "PORTUGESE BIBLE": "POR",
+
+    # Romanian
+    "ROMANIAN: CORNILESCU": "ROCORN",
+
+    # Russian
+    "RUSSIAN KOI8R": "RUKOI8R",
+    "RUSSIAN: SYNODAL TRANSLATION (1876)": "RUSYNO1876",
+
+    # Albanian
+    "ALBANIAN": "ALB",
+
+    # Swedish
+    "SWEDISH (1917)": "SWE1917",
+
+    # Swahili
+    "SWAHILI NT": "SWHNT",
+
+    # Thai
+    "THAI: FROM KJV": "THKJV",
+
+    # Turkish
+    "TURKISH": "TUR",
+
+    # Ukrainian
+    "UKRAINIAN: NT": "UKRNT",
+
+    # Undetermined-language scholarly texts and others under und/
+    "ALEPPO CODEX": "ALEPPO",
+    "AMERICAN KING JAMES VERSION": "AKJV",
+    "BASQUE (NAVARRO-LABOURDIN): NT": "BSQNT",
+    "KABYLE: NT": "KABNT",
+    "RP BYZANTINE MAJORITY TEXT 2005": "RP2005",
+    "SCRIVENER'S TEXTUS RECEPTUS (1894) - TRANSLITERATED": "TR1894TR",
+    "SCRIVENER'S TEXTUS RECEPTUS 1894": "TR1894",
+    "STEPHANUS TEXTUS RECEPTUS 1550": "TR1550",
+    "STEPHENS TEXTUS RECEPTUS (1550) - TRANSLITERATED": "TR1550TR",
+    "TAWALLAMAT TAMAJAQ NT": "TTNT",
+    "TISCHENDORF 8TH EDITION": "TISCH8",
+    "WESTCOTT AND HORT 1881 - TRANSLITERATED": "WH1881TR",
+    "WESTCOTT AND HORT 1881": "WH1881",
+
+    # Vietnamese
+    "VIETNAMESE (1934)": "VIE1934",
+
+    # Chinese
+    "CHINESE BIBLE: UNION (SIMPLIFIED)": "CUNPSS",
+    "CHINESE BIBLE: UNION (TRADITIONAL)": "CUNPTR",
+}

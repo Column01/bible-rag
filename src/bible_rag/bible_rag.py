@@ -1,0 +1,229 @@
+import argparse
+import glob
+import json
+import os
+import subprocess
+from argparse import Namespace
+
+import lmstudio as lms
+import numpy as np
+from usearch.index import Index
+from version_codes import KNOWN_CODES
+
+# The model used for embedding, loaded when first needed
+embed_model = None
+
+
+def get_embed_model():
+    global embed_model
+    if embed_model is None:
+        embed_model = lms.embedding_model("text-embedding-nomic-embed-text-v1.5")
+    return embed_model
+
+
+def create_index_and_metadata() -> tuple[Index, dict]:
+    return Index(ndim=768), []
+
+
+def sanitize(text: str) -> str:
+    new_text = (
+        text.replace("“", '"').replace("”", '"').replace("’", "'").replace("‘", "'")
+    )
+    return new_text
+
+
+def format_book(
+    book_name: str,
+    content: dict,
+) -> tuple[list[str], list[dict]]:
+    documents = []
+    metadatas = []
+    for chapter, verses in content.items():
+        print(f"Working on {book_name} {chapter}")
+        for verse_num, verse_text in verses.items():
+            # Format the document for what the nomic-ai/modernbert-embed-text-v1.5 model expects
+            verse_text = sanitize(verse_text)
+            document = (
+                f"search_document: {book_name} {chapter}:{verse_num} {verse_text}"
+            )
+            documents.append(document)
+            metadatas.append(
+                {
+                    "book": book_name,
+                    "chapter": chapter,
+                    "verse": verse_num,
+                    "text": verse_text,
+                }
+            )
+
+    return documents, metadatas
+
+
+def setup(args: Namespace):
+    # Creates the data path directory
+    data_path = args.data_path
+    if not os.path.exists(data_path):
+        os.mkdir(data_path)
+
+    # Make the embeddings directory
+    if not os.path.exists(os.path.join(data_path, "embeddings")):
+        os.mkdir(os.path.join(data_path, "embeddings"))
+        os.mkdir(os.path.join(data_path, "embeddings", "versions"))
+
+    # Scrape all versions of scripture using the bible scraper tool installed during setup
+    subprocess.run(
+        [
+            "bible-scraper",
+            "--output",
+            os.path.join(data_path, "bible_data.json"),
+            "--resume",
+        ]
+    )
+    # Separate the versions into each individual translation
+    subprocess.run(
+        [
+            "separate-versions",
+            "--input",
+            os.path.join(data_path, "bible_data.json"),
+            "--output",
+            os.path.join(data_path, "versions"),
+        ]
+    )
+
+    # Generate embeddings for all translations
+    embed_model = get_embed_model()
+
+    global_index, global_metadata = create_index_and_metadata()
+
+    for f_name in glob.glob(f"{data_path}/versions/*.json"):
+        version_literal = os.path.split(f_name)[-1].replace(".json", "")
+        version_str = KNOWN_CODES.get(version_literal, version_literal)
+        print(f"Working on translation: {version_str}")
+        version_index, version_metadata = create_index_and_metadata()
+        if "ENGLISH STANDARD VERSION" in f_name:
+            with open(f_name, "r", encoding="utf-8") as fp:
+                bible_json = json.load(fp)
+                embeddings = []
+                for book, content in bible_json.items():
+                    documents, metadatas = format_book(book, content)
+                    print(f"Generating embeddings Book: {book}")
+                    book_embeddings = embed_model.embed(documents)
+                    embeddings.extend(book_embeddings)
+                    version_metadata.extend(metadatas)
+                    global_metadata.extend(metadatas)
+
+                with open(
+                    os.path.join(
+                        data_path, "embeddings", f"{version_str}_metadata.json"
+                    ),
+                    "w",
+                    encoding="utf-8",
+                ) as fp:
+                    json.dump(version_metadata, fp, indent=4)
+                with open(
+                    os.path.join(data_path, "embeddings", "metadata.json"),
+                    "w",
+                    encoding="utf-8",
+                ) as fp:
+                    json.dump(global_metadata, fp, indent=4)
+
+                stacked = np.stack(embeddings)  # [N, 768]
+                # Add the embeddings to the version, and global indices
+                keys = np.arange(len(embeddings))
+                version_index.add(keys, stacked)
+                keys = keys + len(global_index)
+                global_index.add(keys, stacked)
+
+                version_index.save(
+                    os.path.join(
+                        data_path, "embeddings", f"{version_str}_index.usearch"
+                    )
+                )
+                global_index.save(
+                    os.path.join(data_path, "embeddings", f"index.usearch")
+                )
+
+    print(
+        "\nAll set to start querying scripture! Run the program again without the setup flag to search over scripture (bible-rag --help)"
+    )
+
+
+def search(args):
+    embed_model = get_embed_model()
+    data_path = args.data_path
+
+    index_path = "index.usearch"
+    metadata_path = "metadata.json"
+
+    query = f"search_query: {args.search}"
+    encoded_query = np.array(embed_model.embed(query))
+    if args.translation:
+        if args.translation in KNOWN_CODES.keys():
+           index_path = f"{args.translation}_index.usearch"
+           metadata_path = f"{args.translation}_metadata.json"
+
+    with open(os.path.join(data_path, "embeddings", metadata_path), "r", encoding="utf-8") as fp:
+        metadata = json.load(fp)
+    index = Index.restore(os.path.join(data_path, "embeddings", index_path))
+    matches = index.search(encoded_query, args.n_docs)
+    documents = []
+    for document in matches:
+        data = metadata[document.key]
+        data["distance"] = float(document.distance)
+        print(data)
+        documents.append(data)
+
+    if args.output:
+        with open("output.json", "w", encoding="utf-8") as fp:
+            json.dump(documents, fp, indent=4)
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="bible_rag",
+        description="A CLI tool for doing RAG over the text of the bible",
+    )
+
+    parser.add_argument(
+        "--setup",
+        action="store_true",
+        help="Runs the initial setup of the program up for running RAG over scripture. **USES A TOOL TO DOWNLOAD SCRIPTURE, THIS WILL TAKE A LONG TIME!**",
+    )
+
+    parser.add_argument(
+        "--data-path",
+        help="Sets the path to where Bible data is stored",
+        default="data/",
+    )
+
+    parser.add_argument(
+        "-s",
+        "--search", help="Searches the Bible for related verses to the entered text"
+    )
+
+    parser.add_argument("-t", "--translation", help="Sets the preferred translation to search, otherwise defaults to all translations", default="all")
+
+    parser.add_argument("-l", "--list-translations", help="Lists the translations available", action="store_true")
+
+    parser.add_argument(
+        "-n", "--n-docs", help="Number of documents to retrieve", type=int, default=5
+    )
+
+    parser.add_argument(
+        "-o", "--output", help="Outputs the results to a .json file", default="output.json", action="store_true"
+    )
+
+    args = parser.parse_args()
+    if args.list_translations:
+        for name, version_code in KNOWN_CODES.items():
+            print(f"{version_code}:")
+            print(f"    Name: {name}")
+    if args.setup:
+        setup(args)
+
+    if args.search:
+        search(args)
+
+
+if __name__ == "__main__":
+    main()
