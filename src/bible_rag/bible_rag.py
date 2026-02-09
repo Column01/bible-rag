@@ -160,9 +160,9 @@ def search(args):
     query = f"search_query: {args.search}"
     encoded_query = np.array(embed_model.embed(query))
     if args.translation:
-        if args.translation in KNOWN_CODES.keys():
-           index_path = f"{args.translation}_index.usearch"
-           metadata_path = f"{args.translation}_metadata.json"
+        if args.translation in KNOWN_CODES.values():
+           index_path = os.path.join("versions", f"{args.translation}_index.usearch")
+           metadata_path = os.path.join("versions", f"{args.translation}_metadata.json")
 
     with open(os.path.join(data_path, "embeddings", metadata_path), "r", encoding="utf-8") as fp:
         metadata = json.load(fp)
