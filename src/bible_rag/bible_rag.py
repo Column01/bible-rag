@@ -112,6 +112,7 @@ def setup(args: Namespace):
                 book_embeddings = embed_model.embed(documents)
                 embeddings.extend(book_embeddings)
                 version_metadata.extend(metadatas)
+                metadatas["version"] = version_str
                 global_metadata.extend(metadatas)
 
             with open(
