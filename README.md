@@ -8,7 +8,9 @@ Simple CLI tool for retreiving scripture via text embedings (future plan to add 
 2. `pip install .` in the root of the repository
 3. `bible-rag --help`
 
-You must run `bible-rag --setup` at least once to setup the project for searching
+You must run `bible-rag --setup` at least once to setup the project for searching. 
+
+You can limit it to indexing your preferred translation by using the `--translation` flag with any translation code listed in `bible-rag --list-translations` (make sure you have terminal that can scroll)
 
 ## Example
 
