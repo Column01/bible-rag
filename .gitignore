@@ -3,3 +3,5 @@ html_cache
 data
 __pycache__
 *.json
+build
+*.egg-info

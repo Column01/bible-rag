@@ -8,7 +8,7 @@ from argparse import Namespace
 import lmstudio as lms
 import numpy as np
 from usearch.index import Index
-from version_codes import KNOWN_CODES
+from bible_rag.version_codes import KNOWN_CODES
 
 # The model used for embedding, loaded when first needed
 embed_model = None
@@ -98,50 +98,52 @@ def setup(args: Namespace):
     for f_name in glob.glob(f"{data_path}/versions/*.json"):
         version_literal = os.path.split(f_name)[-1].replace(".json", "")
         version_str = KNOWN_CODES.get(version_literal, version_literal)
+        if args.translation and args.translation != version_str:
+            continue
         print(f"Working on translation: {version_str}")
         version_index, version_metadata = create_index_and_metadata()
-        if "ENGLISH STANDARD VERSION" in f_name:
-            with open(f_name, "r", encoding="utf-8") as fp:
-                bible_json = json.load(fp)
-                embeddings = []
-                for book, content in bible_json.items():
-                    documents, metadatas = format_book(book, content)
-                    print(f"Generating embeddings Book: {book}")
-                    book_embeddings = embed_model.embed(documents)
-                    embeddings.extend(book_embeddings)
-                    version_metadata.extend(metadatas)
-                    global_metadata.extend(metadatas)
 
-                with open(
-                    os.path.join(
-                        data_path, "embeddings", f"{version_str}_metadata.json"
-                    ),
-                    "w",
-                    encoding="utf-8",
-                ) as fp:
-                    json.dump(version_metadata, fp, indent=4)
-                with open(
-                    os.path.join(data_path, "embeddings", "metadata.json"),
-                    "w",
-                    encoding="utf-8",
-                ) as fp:
-                    json.dump(global_metadata, fp, indent=4)
+        with open(f_name, "r", encoding="utf-8") as fp:
+            bible_json = json.load(fp)
+            embeddings = []
+            for book, content in bible_json.items():
+                documents, metadatas = format_book(book, content)
+                print(f"Generating embeddings for Book: {book}")
+                book_embeddings = embed_model.embed(documents)
+                embeddings.extend(book_embeddings)
+                version_metadata.extend(metadatas)
+                global_metadata.extend(metadatas)
 
-                stacked = np.stack(embeddings)  # [N, 768]
-                # Add the embeddings to the version, and global indices
-                keys = np.arange(len(embeddings))
-                version_index.add(keys, stacked)
-                keys = keys + len(global_index)
-                global_index.add(keys, stacked)
+            with open(
+                os.path.join(
+                    data_path, "embeddings", "versions", f"{version_str}_metadata.json"
+                ),
+                "w",
+                encoding="utf-8",
+            ) as fp:
+                json.dump(version_metadata, fp, indent=4)
+            with open(
+                os.path.join(data_path, "embeddings", "metadata.json"),
+                "w",
+                encoding="utf-8",
+            ) as fp:
+                json.dump(global_metadata, fp, indent=4)
 
-                version_index.save(
-                    os.path.join(
-                        data_path, "embeddings", f"{version_str}_index.usearch"
-                    )
+            stacked = np.stack(embeddings)  # [N, 768]
+            # Add the embeddings to the version, and global indices
+            keys = np.arange(len(embeddings))
+            version_index.add(keys, stacked)
+            keys = keys + len(global_index)
+            global_index.add(keys, stacked)
+
+            version_index.save(
+                os.path.join(
+                    data_path, "embeddings", "versions", f"{version_str}_index.usearch"
                 )
-                global_index.save(
-                    os.path.join(data_path, "embeddings", f"index.usearch")
-                )
+            )
+            global_index.save(
+                os.path.join(data_path, "embeddings", f"index.usearch")
+            )
 
     print(
         "\nAll set to start querying scripture! Run the program again without the setup flag to search over scripture (bible-rag --help)"
@@ -201,7 +203,7 @@ def main():
         "--search", help="Searches the Bible for related verses to the entered text"
     )
 
-    parser.add_argument("-t", "--translation", help="Sets the preferred translation to search, otherwise defaults to all translations", default="all")
+    parser.add_argument("-t", "--translation", help="Sets the translation to index or search, otherwise defaults to all translations")
 
     parser.add_argument("-l", "--list-translations", help="Lists the translations available", action="store_true")
 
