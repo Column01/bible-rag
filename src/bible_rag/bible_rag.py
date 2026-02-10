@@ -3,10 +3,13 @@ import glob
 import json
 import os
 import subprocess
+import zipfile
 from argparse import Namespace
+from io import BytesIO
 
 import lmstudio as lms
 import numpy as np
+import requests
 from usearch.index import Index
 from bible_rag.version_codes import KNOWN_CODES
 
@@ -33,8 +36,7 @@ def sanitize(text: str) -> str:
 
 
 def format_book(
-    book_name: str,
-    content: dict,
+    book_name: str, content: dict, translation: str
 ) -> tuple[list[str], list[dict]]:
     documents = []
     metadatas = []
@@ -53,6 +55,7 @@ def format_book(
                     "chapter": chapter,
                     "verse": verse_num,
                     "text": verse_text,
+                    "translation": translation,
                 }
             )
 
@@ -70,15 +73,44 @@ def setup(args: Namespace):
         os.mkdir(os.path.join(data_path, "embeddings"))
         os.mkdir(os.path.join(data_path, "embeddings", "versions"))
 
-    # Scrape all versions of scripture using the bible scraper tool installed during setup
-    subprocess.run(
-        [
-            "bible-scraper",
-            "--output",
-            os.path.join(data_path, "bible_data.json"),
-            "--resume",
-        ]
+    # Make the resources directory
+    if not os.path.exists(os.path.join(data_path, "resources")):
+        os.mkdir(os.path.join(data_path, "resources"))
+
+    print("Downloading scripture cross references")
+    # Download scripture cross references
+    resp = requests.get(
+        "https://a.openbible.info/data/cross-references.zip",
+        headers={"User-Agent": "bible-rag by Column01 on GitHub"},
     )
+
+    # Extract the cross references in memory and write them to disk
+    if resp.status_code == 200:
+        print("Saving cross references file to memory")
+        zip_fp = zipfile.ZipFile(BytesIO(resp.content))
+        print("Opening the zip file")
+        with zip_fp as zip_file:
+            print("Extracting cross references...")
+            with zip_file.open("cross_references.txt") as cross_references:
+                with open(
+                    os.path.join(data_path, "resources", "cross_references.txt"), "w"
+                ) as fp:
+                    fp.write(cross_references.read().decode("utf-8"))
+
+    else:
+        exit(
+            f"There was an error when downloading, please try again later. Status Code: {resp.status_code}"
+        )
+
+    scraper_cmd = [
+        "bible-scraper",
+        "--output",
+        os.path.join(data_path, "bible_data.json"),
+    ]
+    if args.resume:
+        scraper_cmd.append("--resume")
+    # Scrape all versions of scripture using the bible scraper tool installed during setup
+    subprocess.run(scraper_cmd)
     # Separate the versions into each individual translation
     subprocess.run(
         [
@@ -97,27 +129,27 @@ def setup(args: Namespace):
 
     for f_name in glob.glob(f"{data_path}/versions/*.json"):
         version_literal = os.path.split(f_name)[-1].replace(".json", "")
-        version_str = KNOWN_CODES.get(version_literal, version_literal)
-        if args.translation and args.translation != version_str:
+        translation = KNOWN_CODES.get(version_literal, version_literal)
+        print(translation)
+        if args.translation and args.translation != translation:
             continue
-        print(f"Working on translation: {version_str}")
+        print(f"Working on translation: {translation}")
         version_index, version_metadata = create_index_and_metadata()
 
         with open(f_name, "r", encoding="utf-8") as fp:
             bible_json = json.load(fp)
             embeddings = []
             for book, content in bible_json.items():
-                documents, metadatas = format_book(book, content)
+                documents, metadatas = format_book(book, content, translation)
                 print(f"Generating embeddings for Book: {book}")
                 book_embeddings = embed_model.embed(documents)
                 embeddings.extend(book_embeddings)
                 version_metadata.extend(metadatas)
-                metadatas["version"] = version_str
                 global_metadata.extend(metadatas)
 
             with open(
                 os.path.join(
-                    data_path, "embeddings", "versions", f"{version_str}_metadata.json"
+                    data_path, "embeddings", "versions", f"{translation}_metadata.json"
                 ),
                 "w",
                 encoding="utf-8",
@@ -139,12 +171,10 @@ def setup(args: Namespace):
 
             version_index.save(
                 os.path.join(
-                    data_path, "embeddings", "versions", f"{version_str}_index.usearch"
+                    data_path, "embeddings", "versions", f"{translation}_index.usearch"
                 )
             )
-            global_index.save(
-                os.path.join(data_path, "embeddings", f"index.usearch")
-            )
+            global_index.save(os.path.join(data_path, "embeddings", f"index.usearch"))
 
     print(
         "\nAll set to start querying scripture! Run the program again without the setup flag to search over scripture (bible-rag --help)"
@@ -162,10 +192,14 @@ def search(args):
     encoded_query = np.array(embed_model.embed(query))
     if args.translation:
         if args.translation in KNOWN_CODES.values():
-           index_path = os.path.join("versions", f"{args.translation}_index.usearch")
-           metadata_path = os.path.join("versions", f"{args.translation}_metadata.json")
+            index_path = os.path.join("versions", f"{args.translation}_index.usearch")
+            metadata_path = os.path.join(
+                "versions", f"{args.translation}_metadata.json"
+            )
 
-    with open(os.path.join(data_path, "embeddings", metadata_path), "r", encoding="utf-8") as fp:
+    with open(
+        os.path.join(data_path, "embeddings", metadata_path), "r", encoding="utf-8"
+    ) as fp:
         metadata = json.load(fp)
     index = Index.restore(os.path.join(data_path, "embeddings", index_path))
     matches = index.search(encoded_query, args.n_docs)
@@ -190,7 +224,13 @@ def main():
     parser.add_argument(
         "--setup",
         action="store_true",
-        help="Runs the initial setup of the program up for running RAG over scripture. **USES A TOOL TO DOWNLOAD SCRIPTURE, THIS WILL TAKE A LONG TIME!**",
+        help="TAKES A LONG TIME! Run when you do not need your computer (overnight). Does the initial setup of the program up for running RAG over scripture.",
+    )
+
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Use in combination with `--setup` to re-process the data without redownloading all of the scripture",
     )
 
     parser.add_argument(
@@ -201,19 +241,33 @@ def main():
 
     parser.add_argument(
         "-s",
-        "--search", help="Searches the Bible for related verses to the entered text"
+        "--search",
+        help="Searches the Bible for related verses to the entered text",
     )
 
-    parser.add_argument("-t", "--translation", help="Sets the translation to index or search, otherwise defaults to all translations")
+    parser.add_argument(
+        "-t",
+        "--translation",
+        help="Sets the translation to index or search, otherwise defaults to all translations",
+    )
 
-    parser.add_argument("-l", "--list-translations", help="Lists the translations available", action="store_true")
+    parser.add_argument(
+        "-l",
+        "--list-translations",
+        help="Lists the translations available",
+        action="store_true",
+    )
 
     parser.add_argument(
         "-n", "--n-docs", help="Number of documents to retrieve", type=int, default=5
     )
 
     parser.add_argument(
-        "-o", "--output", help="Outputs the results to a .json file", default="output.json", action="store_true"
+        "-o",
+        "--output",
+        help="Outputs the results to a .json file",
+        default="output.json",
+        action="store_true",
     )
 
     args = parser.parse_args()
