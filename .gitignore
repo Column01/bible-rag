@@ -1,4 +1,4 @@
-﻿bible_scraper.log
+﻿*.log
 html_cache
 data
 __pycache__
