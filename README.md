@@ -28,3 +28,11 @@ him.', 'distance': 0.22948765754699707}
 {'book': 'Daniel', 'chapter': '10', 'verse': '16', 'text': 'And behold, one in the likeness of the children of man touched my lips. Then I opened my mouth and spoke. I said to him who stood before me, "O my lord, by reason of the vision pains have come upon me, and I retain no strength.', 'distance': 0.26260238885879517}
 {'book': 'Ezekiel', 'chapter': '16', 'verse': '2', 'text': '"Son of man, make known to Jerusalem her abominations,', 'distance': 0.26514875888824463}
 ```
+
+## Credits and Attributions
+
+- God the Father, the Son and the Holy Spirit for saving me and giving me the gifts I have (1 Peter 4:7-11; 1 Corinthians 12:4-11)
+- The creators of all the translations of scripture that get downloaded by this project. Full credits and copyright due to them, none of their data should be distributed in this repo unless allowed and attribution given
+- Aaron Taylor and collaborators for creating [bible-versions](https://github.com/arron-taylor/bible-versions) which is used for downloading all scripture
+- [OpenBible.info](https://www.openbible.info/labs/cross-references/) for compiling the cross reference database
+- [The Treasury of Scripture Knowledge](https://thetreasuryofscriptureknowledge.com/) who provided the data for OpenBible.info to compile into the database
