@@ -63,12 +63,6 @@ def format_book(
     return documents, metadatas
 
 
-def chunks(l, n):
-    """Yield n number of striped chunks from l."""
-    for i in range(0, n):
-        yield l[i::n]
-
-
 def setup(args: Namespace):
     # Creates the data path directory
     data_path = args.data_path
