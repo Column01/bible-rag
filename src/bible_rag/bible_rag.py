@@ -122,15 +122,16 @@ def setup(args: Namespace):
         ]
     )
 
+    print("Loading text embedding model...")
     # Generate embeddings for all translations
     embed_model = get_embed_model()
 
     global_index, global_metadata = create_index_and_metadata()
 
+    print("Creating index...")
     for f_name in glob.glob(f"{data_path}/versions/*.json"):
         version_literal = os.path.split(f_name)[-1].replace(".json", "")
         translation = KNOWN_CODES.get(version_literal, version_literal)
-        print(translation)
         if args.translation and args.translation != translation:
             continue
         print(f"Working on translation: {translation}")
