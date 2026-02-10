@@ -267,7 +267,6 @@ def main():
         "-o",
         "--output",
         help="Outputs the results to a .json file",
-        default="output.json",
         action="store_true",
     )
 
