@@ -68,7 +68,7 @@ def setup(args: Namespace):
     data_path = args.data_path
     if not os.path.exists(data_path):
         os.mkdir(data_path)
-    
+
     # Delete existing embeddings if we are not resuming
     if not args.resume:
         try:
@@ -81,7 +81,6 @@ def setup(args: Namespace):
     # Make the embeddings directory
     if not os.path.exists(os.path.join(data_path, "embeddings")):
         os.mkdir(os.path.join(data_path, "embeddings"))
-        os.mkdir(os.path.join(data_path, "embeddings", "versions"))
 
     # Make the resources directory
     if not os.path.exists(os.path.join(data_path, "resources")):
@@ -136,8 +135,6 @@ def setup(args: Namespace):
     # Generate embeddings for all translations
     embed_model = get_embed_model()
 
-    global_index, global_metadata = create_index_and_metadata()
-
     print("Creating index...")
     for f_name in glob.glob(f"{data_path}/versions/*.json"):
         version_literal = os.path.split(f_name)[-1].replace(".json", "")
@@ -148,7 +145,7 @@ def setup(args: Namespace):
         # Only do translations we haven't indexed, should only skip if the user uses --resume
         if not os.path.exists(
             os.path.join(
-                data_path, "embeddings", "versions", f"{translation}_metadata.json"
+                data_path, "embeddings", f"{translation}_metadata.json"
             )
         ):
             print(f"Working on translation: {translation}")
@@ -159,26 +156,11 @@ def setup(args: Namespace):
                 embeddings = []
                 for book, content in bible_json.items():
                     documents, metadatas = format_book(book, content, translation)
-                    print(f"[{translation}] Generating embeddings for Book: {book}")
-
-                    # Save a copy of the metadata to the global metadata
-                    global_metadata.extend(copy.deepcopy(metadatas))
-                    with open(
-                        os.path.join(data_path, "embeddings", "metadata.json"),
-                        "w",
-                        encoding="utf-8",
-                    ) as fp:
-                        json.dump(global_metadata, fp, indent=4)
-
-                    # Remove the translation info from the version metadata and save that too
-                    for metadata in metadatas:
-                        del metadata["translation"]
-                        version_metadata.append(metadata)
+                    version_metadata.extend(metadatas)
                     with open(
                         os.path.join(
                             data_path,
                             "embeddings",
-                            "versions",
                             f"{translation}_metadata.json",
                         ),
                         "w",
@@ -186,30 +168,22 @@ def setup(args: Namespace):
                     ) as fp:
                         json.dump(version_metadata, fp, indent=4)
 
+                    print(f"[{translation}] Generating embeddings for Book: {book}")
                     book_embeddings = embed_model.embed(documents)
                     embeddings.extend(book_embeddings)
 
                 stacked = np.stack(embeddings)  # [N, 768]
-                # Add the embeddings to the version, and global indices
+                # Add the embeddings to the version index
                 keys = np.arange(len(embeddings))
                 version_index.add(keys, stacked)
-                keys = keys + len(global_index)
-                global_index.add(keys, stacked)
 
                 version_index.save(
                     os.path.join(
                         data_path,
                         "embeddings",
-                        "versions",
                         f"{translation}_index.usearch",
                     )
                 )
-
-                if not args.translation:
-                    # Only save the global index if we're not working with a single translation, otherwise it overwrites it ruining it...
-                    global_index.save(
-                        os.path.join(data_path, "embeddings", f"index.usearch")
-                    )
 
     print(
         "\nAll set to start querying scripture! Run the program again without the setup flag to search over scripture (bible-rag --help)"
@@ -220,38 +194,64 @@ def search(args):
     embed_model = get_embed_model()
     data_path = args.data_path
 
-    index_path = "index.usearch"
-    metadata_path = "metadata.json"
-
     query = f"search_query: {args.search}"
     encoded_query = np.array(embed_model.embed(query))
+
+    match_collection = []
+    documents = []
     translation = args.translation
     if translation:
         if translation in KNOWN_CODES.keys():
             translation = KNOWN_CODES.get(translation, translation)
         if translation in KNOWN_CODES.values():
-            index_path = os.path.join("versions", f"{translation}_index.usearch")
-            metadata_path = os.path.join("versions", f"{translation}_metadata.json")
+            index_path = os.path.join(
+                data_path, "embeddings", f"{translation}_index.usearch"
+            )
+            metadata_path = os.path.join(
+                data_path, "embeddings", f"{translation}_metadata.json"
+            )
 
-    with open(
-        os.path.join(data_path, "embeddings", metadata_path), "r", encoding="utf-8"
-    ) as fp:
-        metadata = json.load(fp)
+        with open(metadata_path, "r", encoding="utf-8") as fp:
+            metadata = json.load(fp)
 
-    index = Index.restore(os.path.join(data_path, "embeddings", index_path))
-    matches = index.search(encoded_query, args.n_docs)
-    documents = []
-
-    if translation:
-        for document in matches:
-            data = metadata[translation][document.key]
+        index = Index.restore(index_path)
+        for document in index.search(encoded_query, args.n_docs):
+            data = metadata[document.key]
+            data["key"] = document.key
             data["distance"] = float(document.distance)
+            data["translation"] = translation
             documents.append(data)
     else:
         for translation in KNOWN_CODES.values():
-            data = metadata[translation]
+            index_path = os.path.join(
+                data_path, "embeddings", f"{translation}_index.usearch"
+            )
+            metadata_path = os.path.join(
+                data_path, "embeddings", f"{translation}_metadata.json"
+            )
+            if os.path.exists(metadata_path) and os.path.exists(index_path):
+                print(f"Searching index of translation {translation}")
+                with open(
+                    metadata_path,
+                    "r",
+                    encoding="utf-8",
+                ) as fp:
+                    metadata = json.load(fp)
+                index = Index.restore(index_path)
+                for document in index.search(encoded_query, args.n_docs):
+                    data = metadata[document.key]
+                    data["key"] = document.key
+                    data["distance"] = float(document.distance)
+                    data["translation"] = translation
+                    documents.append(data)
 
-    print(*documents)
+    # Collect only the first N docs sorted by distance (should work with every translation and with individual ones)
+    sorted_docs = sorted(documents, key=lambda x: x["distance"])[:args.n_docs]
+    for doc in sorted_docs:
+        print(
+            f"({doc["key"]} / {doc["distance"]}) [{doc["translation"]}] {doc["book"]} {doc["chapter"]}:{doc["verse"]} {doc["text"]}"
+        )
+
     if args.output:
         with open("output.json", "w", encoding="utf-8") as fp:
             json.dump(documents, fp, indent=4)
