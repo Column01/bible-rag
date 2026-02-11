@@ -217,7 +217,7 @@ def search(args):
         index = Index.restore(index_path)
         for document in index.search(encoded_query, args.n_docs):
             data = metadata[document.key]
-            data["key"] = document.key
+            data["key"] = int(document.key)
             data["distance"] = float(document.distance)
             data["translation"] = translation
             documents.append(data)
@@ -240,7 +240,7 @@ def search(args):
                 index = Index.restore(index_path)
                 for document in index.search(encoded_query, args.n_docs):
                     data = metadata[document.key]
-                    data["key"] = document.key
+                    data["key"] = int(document.key)
                     data["distance"] = float(document.distance)
                     data["translation"] = translation
                     documents.append(data)
